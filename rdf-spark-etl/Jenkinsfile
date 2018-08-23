@@ -1,0 +1,53 @@
+String Application = 'rdf-spark-etl'
+String ApplicationPort = '8050'
+String SlackChannel = '#orange'
+
+properties([
+    gitLabConnection('rwes-gitlab01.internal.imsglobal.com-API'),
+    [$class: 'GitlabLogoProperty', repositoryName: 'ShopFloor/rdf-spark-etl'],
+    [$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: false],
+    pipelineTriggers([])
+])
+
+String Maven = 'export MAVEN_OPTS="-Xmx1024m -XX:MaxPermSize=1024m"; /opt/apache-maven-3.3.9/bin/mvn -s /opt/apache-maven-3.3.9/conf/settings.xml -gs /opt/apache-maven-3.3.9/conf/settings.xml'
+String POM_VERSION = ''
+String message = ''
+Boolean deploySuccess = true
+
+node('master') {
+
+	stage('Checkout ') {
+		deleteDir()
+		checkout scm
+	    sh "git checkout ${BRANCH_NAME}"
+	}
+
+	gitlabCommitStatus(name: 'jenkins') {
+
+        stage('SBT Test') {
+            sh 'sbt -Dsbt.override.build.repos=true -Dsbt.repository.config=deployment/artifactory.repositories test'
+        }
+
+        stage('SBT Assembly') {
+            sh 'sbt -Dsbt.override.build.repos=true -Dsbt.repository.config=deployment/artifactory.repositories assembly'
+        }
+
+        stage('Docker Build') {
+            SBT_VERSION = sh (
+                script: 'sbt version',
+                returnStdout: true
+            ).tokenize().last().replaceAll('\\[0m', '').trim()
+	        sh 'cp target/scala-2.11/ETL-assembly-' + SBT_VERSION + '.jar deployment/' + Application+ '.jar'
+            build job: 'dockerise/master',
+            parameters: [
+                string(name: 'APPLICATION', value: Application),
+                string(name: 'APPLICATIONVERSION', value: SBT_VERSION),
+                string(name: 'BUILDFOLDER', value: WORKSPACE + '/deployment'),
+                string(name: 'APPLICATIONBUILDID', value: "")
+            ]
+        }
+
+	}
+
+}
+

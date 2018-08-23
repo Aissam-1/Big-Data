@@ -1,0 +1,10 @@
+.idea/
+target/
+**/project/plugins.sbt
+project/
+**/.DS_Store
+cheatsheet.md
+lib_managed
+lib/ojdbc8-12.2.0.1.jar
+lib/rdf-framework-spark-1.0.51.0.jar
+lib/rdf-framework-utils-1.0.51.0.jar
